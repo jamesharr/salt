@@ -63,6 +63,9 @@ to use a YAML 'explicit key', as demonstrated in the second example below.
 import re
 import sys
 
+# Form of '{options} {enc} {key} {comment}'
+RE_SSHKEY = re.compile(r"^(.*?)\s?((?:sk-)?(?:ssh\-|ecds)[\w-]+(?:@openssh\.com)?\s.+)$")
+RE_SSHKEY_RELAXED = re.compile(r"^(sk-)?(ssh\-|ecds).*")
 
 def _present_test(
     user, name, enc, comment, options, source, config, fingerprint_hash_type
@@ -99,8 +102,7 @@ def _present_test(
             )
     else:
         # check if this is of form {options} {enc} {key} {comment}
-        sshre = re.compile(r"^(.*?)\s?((?:sk-)?(?:ssh\-|ecds)[\w-]+\s.+)$")
-        fullkey = sshre.search(name)
+        fullkey = RE_SSHKEY.search(name)
         # if it is {key} [comment]
         if not fullkey:
             key_and_comment = name.split()
@@ -172,8 +174,7 @@ def _absent_test(
             return (True, "All host keys in file {} are already absent".format(source))
     else:
         # check if this is of form {options} {enc} {key} {comment}
-        sshre = re.compile(r"^(.*?)\s?((?:sk-)?(?:ssh\-|ecds)[\w-]+\s.+)$")
-        fullkey = sshre.search(name)
+        fullkey = RE_SSHKEY.search(name)
         # if it is {key} [comment]
         if not fullkey:
             key_and_comment = name.split()
@@ -269,8 +270,7 @@ def present(
 
     if source == "":
         # check if this is of form {options} {enc} {key} {comment}
-        sshre = re.compile(r"^(.*?)\s?((?:sk-)?(?:ssh\-|ecds)[\w-]+\s.+)$")
-        fullkey = sshre.search(name)
+        fullkey = RE_SSHKEY.search(name)
         # if it is {key} [comment]
         if not fullkey:
             key_and_comment = name.split(None, 1)
@@ -311,10 +311,9 @@ def present(
         key = __salt__["cp.get_file_str"](source, saltenv=__env__)
         filehasoptions = False
         # check if this is of form {options} {enc} {key} {comment}
-        sshre = re.compile(r"^(sk-)?(ssh\-|ecds).*")
         key = key.rstrip().split("\n")
         for keyline in key:
-            filehasoptions = sshre.match(keyline)
+            filehasoptions = RE_SSHKEY_RELAXED.match(keyline)
             if not filehasoptions:
                 data = __salt__["ssh.set_auth_key_from_file"](
                     user,
@@ -460,10 +459,9 @@ def absent(
         key = __salt__["cp.get_file_str"](source, saltenv=__env__)
         filehasoptions = False
         # check if this is of form {options} {enc} {key} {comment}
-        sshre = re.compile(r"^(sk-)?(ssh\-|ecds).*")
         key = key.rstrip().split("\n")
         for keyline in key:
-            filehasoptions = sshre.match(keyline)
+            filehasoptions = RE_SSHKEY_RELAXED.match(keyline)
             if not filehasoptions:
                 ret["comment"] = __salt__["ssh.rm_auth_key_from_file"](
                     user,
@@ -483,8 +481,7 @@ def absent(
                 )
     else:
         # Get just the key
-        sshre = re.compile(r"^(.*?)\s?((?:sk-)?(?:ssh\-|ecds)[\w-]+\s.+)$")
-        fullkey = sshre.search(name)
+        fullkey = RE_SSHKEY.search(name)
         # if it is {key} [comment]
         if not fullkey:
             key_and_comment = name.split(None, 1)
